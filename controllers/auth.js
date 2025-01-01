@@ -4,6 +4,10 @@ import filterObj from '../utils/filterObject.js';
 import crypto from 'crypto';
 import otpGenerator from 'otp-generator';
 import { promisify } from 'util';
+import mailService from '../services/mailer.js';
+import dotenv from 'dotenv';
+
+dotenv.config({ path: '../config.env' });
 
 function signToken(user_id) {
   jwt.sign(
@@ -74,11 +78,25 @@ export const sendOTP = async (req, res, next) => {
   });
 
   // TODO: Send the OTP to the user via email
-
-  res.status(200).json({
-    status: 'success',
-    message: 'OTP sent successfully',
-  });
+  mailService
+    .sendEmail({
+      from: 'divyansh.sri258@gmail.com',
+      to: 'example@gmail.com',
+      subject: 'OTP for Chatr',
+      text: `Your OTP for Chatr is ${new_otp}. It will expire in 10 minutes`,
+    })
+    .then(() => {
+      res.status(200).json({
+        status: 'success',
+        message: 'OTP sent successfully',
+      });
+    })
+    .catch((error) => {
+      return res.status(500).json({
+        status: 'error',
+        message: 'There was an error sending the OTP. Try again later',
+      });
+    });
 };
 
 export const verifyOTP = async (req, res, next) => {
