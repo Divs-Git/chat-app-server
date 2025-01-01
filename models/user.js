@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import { EMAIL_REGEX } from '../constants';
 
 const userSchema = new mongoose.Schema({
@@ -33,6 +34,17 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Please provide a password'],
     minlength: 8,
+  },
+
+  confirmPassword: {
+    type: String,
+    required: [true, 'Please confirm your password'],
+    validate: {
+      validator: function (confirmPassword) {
+        return confirmPassword === this.password;
+      },
+      message: 'Passwords do not match',
+    },
   },
 
   password_changed_at: {
@@ -92,6 +104,23 @@ userSchema.methods.correctPassword = async function (
   userPassword // password that is stored in the database -> $2a$12$3
 ) {
   return await bcrypt.compare(candidatePassword, userPassword);
+};
+
+userSchema.methods.createPasswordResetToken = function () {
+  const resetPasswordToken = crypto.randomBytes(32).toString('hex');
+
+  this.password_reset_token = crypto
+    .createHash('sha256')
+    .update(resetPasswordToken)
+    .digest('hex');
+
+  this.password_reset_expires = Date.now() + 10 * 60 * 1000; // 10 minutes
+
+  return resetPasswordToken;
+};
+
+userSchema.changedPasswordAfter = function (JWTTimestamp) {
+  return JWTTimestamp < this.password_changed_at;
 };
 
 const User = new mongoose.model('User', userSchema);

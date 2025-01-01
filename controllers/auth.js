@@ -1,7 +1,9 @@
 import jwt from 'jsonwebtoken';
 import User from '../models/user.js';
 import filterObj from '../utils/filterObject.js';
+import crypto from 'crypto';
 import otpGenerator from 'otp-generator';
+import { promisify } from 'util';
 
 function signToken(user_id) {
   jwt.sign(
@@ -86,14 +88,14 @@ export const verifyOTP = async (req, res, next) => {
   const user = User.findOne({ email, otp_expiry_time: { $gt: Date.now() } }); // Check if the OTP is still valid
 
   if (!user) {
-    res.status(400).json({
+    return res.status(400).json({
       status: 'error',
       message: 'Email is invalid or OTP has expired',
     });
   }
 
   if (!(await user.correctOTP(otp, user.otp))) {
-    res.status(400).json({
+    return res.status(400).json({
       status: 'error',
       message: 'Incorrect OTP',
     });
@@ -125,7 +127,7 @@ export const login = async (req, res, next) => {
   const user = await User.findOne({ email }).select('+password');
 
   if (!user || !(await user.correctPassword(password, user.password))) {
-    res.status(401).json({
+    return res.status(401).json({
       status: 'error',
       message: 'Incorrect email or password',
     });
@@ -140,6 +142,131 @@ export const login = async (req, res, next) => {
   });
 };
 
-export const forgotPassword = async (req, res, next) => {};
+/**
+ * Types of routes:
+ * 1. Protected routes -> require the user to be logged in
+ * 2. Unprotected routes
+ */
 
-export const resetPassword = async (req, res, next) => {};
+export const protect = async (req, res, next) => {
+  // 1. Get the JWT token and check if it exists
+  let token;
+
+  if (
+    req.headers.authorization &&
+    req.headers.authorization.startsWith('Bearer')
+  ) {
+    token = req.headers.authorization.split(' ')[1];
+  } else if (req.cookies.jwt) {
+    token = req.cookies.jwt;
+  } else {
+    return res.status(401).json({
+      status: 'error',
+      message: 'You are not logged in. Please log in to get access',
+    });
+  }
+
+  // 2. Verify the token
+  const decoded = await promisify(jwt.verify)(token, process.env.JWT_SECRET);
+
+  // 3. Check if the user still exists
+  const current_user = await User.findById(decoded.user_id);
+
+  if (!current_user) {
+    return res.status(401).json({
+      status: 'error',
+      message: 'The user no longer exist',
+    });
+  }
+
+  // 4. Check if the user changed the password after the token was issued
+  // iat -> issued at
+  if (current_user.changedPasswordAfter(decoded.iat)) {
+    return res.status(401).json({
+      status: 'error',
+      message: 'User recently changed password! Please log in again',
+    });
+  }
+
+  // 5. Grant access to the protected route
+  req.user = current_user;
+  next();
+};
+
+export const forgotPassword = async (req, res, next) => {
+  // Find the user with the provided email
+  const user = await User.findOne({ email: req.body.email });
+
+  if (!user) {
+    return res.status(404).json({
+      status: 'error',
+      message: 'User not found',
+    });
+  }
+
+  // Generate a password reset token
+  const resetToken = user.createPasswordResetToken();
+
+  const resetURL = `https://chatr.com/resetPassword/?code=${resetToken}`;
+
+  try {
+    // TODO: Send the resetURL to the user via email
+
+    res.status(200).json({
+      status: 'success',
+      message: 'Reset token sent to email',
+    });
+  } catch (error) {
+    user.password_reset_token = undefined;
+    user.password_reset_expires = undefined;
+
+    await user.save({ validateBeforeSave: false });
+
+    res.status(500).json({
+      status: 'error',
+      message: 'There was an error sending the email. Try again later!',
+    });
+  }
+};
+
+export const resetPassword = async (req, res, next) => {
+  // Find the user with the provided reset token
+  const hashedToken = crypto
+    .createHash('sha256')
+    .update(req.params.token)
+    .digest('hex');
+
+  const user = await User.findOne({
+    password_reset_token: hashedToken,
+    password_reset_expires: { $gt: Date.now() },
+  });
+
+  if (!user) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'Token is invalid or has expired',
+    });
+
+    return;
+  }
+
+  // Update the user's password
+  user.password = req.body.password;
+  user.confirmPassword = req.body.confirmPassword;
+  user.password_reset_token = undefined;
+  user.password_reset_expires = undefined;
+
+  await user.save();
+
+  // Log the user in and send a JWT
+
+  // TODO: Send the user a confirmation email that their password has been changed
+
+  const token = signToken(user._id);
+
+  res.status(200).json({
+    status: 'success',
+    message: 'Password reset successfully',
+    token,
+  });
+};
