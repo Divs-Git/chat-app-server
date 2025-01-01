@@ -3,12 +3,12 @@ import bcrypt from 'bcryptjs';
 import { EMAIL_REGEX } from '../constants';
 
 const userSchema = new mongoose.Schema({
-  firstName: {
+  first_name: {
     type: String,
     required: [true, 'Please provide your first name'],
   },
 
-  lastName: {
+  last_name: {
     type: String,
     required: [true, 'Please provide your last name'],
   },
@@ -35,27 +35,57 @@ const userSchema = new mongoose.Schema({
     minlength: 8,
   },
 
-  passwordChangedAt: {
+  password_changed_at: {
     type: Date,
   },
 
-  passwordResetToken: {
+  password_reset_token: {
     type: String,
   },
 
-  passwordResetExpires: {
+  password_reset_expires: {
     type: Date,
   },
 
-  createdAt: {
+  created_at: {
     type: Date,
     default: Date.now(),
   },
 
-  updatedAt: {
+  updated_at: {
+    type: Date,
+  },
+
+  verified: {
+    type: Boolean,
+    default: false,
+  },
+
+  otp: {
+    type: Number,
+    maxLength: 6,
+  },
+
+  otp_expiry_time: {
     type: Date,
   },
 });
+
+userSchema.pre('save', async function (next) {
+  // Only run when the OTP is modified
+  if (!this.isModified('otp')) return next();
+
+  this.otp = await bcrypt.hash(this.otp, 12);
+
+  next();
+});
+
+userSchema.methods.correctOTP = async function (
+  candiateOTP, // OTP that user provides -> 123456
+  userOTP // OTP that is stored in the database -> $2a$12$3
+) {
+  return await bcrypt.compare(candiateOTP, userOTP);
+};
 
 userSchema.methods.correctPassword = async function (
   candidatePassword, // password that user provides -> 123456
