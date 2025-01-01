@@ -3,7 +3,7 @@ import dotenv from 'dotenv';
 
 dotenv.config({ path: '../config.env' });
 
-sgMail.setApiKey(process.env.SG_API_KEY);
+sgMail.setApiKey(process.env.SG_KEY);
 
 const sendSGMail = async ({
   recipient,

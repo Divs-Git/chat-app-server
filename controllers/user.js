@@ -1,4 +1,4 @@
-import User from '../models/user';
+import User from '../models/user.js';
 
 export const updateMe = async (req, res, next) => {
   const { user } = req;
@@ -22,3 +22,5 @@ export const updateMe = async (req, res, next) => {
     message: 'User updated successfully',
   });
 };
+
+export default { updateMe };

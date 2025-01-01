@@ -288,3 +288,13 @@ export const resetPassword = async (req, res, next) => {
     token,
   });
 };
+
+export default {
+  register,
+  sendOTP,
+  verifyOTP,
+  login,
+  protect,
+  forgotPassword,
+  resetPassword,
+};

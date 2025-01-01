@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
-import { EMAIL_REGEX } from '../constants';
+import { EMAIL_REGEX } from '../constants/index.js';
 
 const userSchema = new mongoose.Schema({
   first_name: {

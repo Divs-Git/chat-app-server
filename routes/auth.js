@@ -13,6 +13,6 @@ router.post('/verify-otp', authController.verifyOTP);
 
 router.post('/forgot-password', authController.forgotPassword);
 
-router.patch('/reset-password', authController.resetPassword);
+router.post('/reset-password', authController.resetPassword);
 
 export default router;
