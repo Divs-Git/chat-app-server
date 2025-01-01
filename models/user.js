@@ -92,6 +92,15 @@ userSchema.pre('save', async function (next) {
   next();
 });
 
+userSchema.pre('save', async function (next) {
+  // Only run when the Password is modified
+  if (!this.isModified('password')) return next();
+
+  this.otp = await bcrypt.hash(this.otp, 12);
+
+  next();
+});
+
 userSchema.methods.correctOTP = async function (
   candiateOTP, // OTP that user provides -> 123456
   userOTP // OTP that is stored in the database -> $2a$12$3
