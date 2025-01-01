@@ -4,12 +4,12 @@ import crypto from 'crypto';
 import { EMAIL_REGEX } from '../constants/index.js';
 
 const userSchema = new mongoose.Schema({
-  first_name: {
+  firstName: {
     type: String,
     required: [true, 'Please provide your first name'],
   },
 
-  last_name: {
+  lastName: {
     type: String,
     required: [true, 'Please provide your last name'],
   },
@@ -32,39 +32,26 @@ const userSchema = new mongoose.Schema({
 
   password: {
     type: String,
-    required: [true, 'Please provide a password'],
-    minlength: 8,
   },
 
-  confirmPassword: {
-    type: String,
-    required: [true, 'Please confirm your password'],
-    validate: {
-      validator: function (confirmPassword) {
-        return confirmPassword === this.password;
-      },
-      message: 'Passwords do not match',
-    },
-  },
-
-  password_changed_at: {
+  passwordChangedAt: {
     type: Date,
   },
 
-  password_reset_token: {
+  passwordResetToken: {
     type: String,
   },
 
-  password_reset_expires: {
+  passwordResetExpires: {
     type: Date,
   },
 
-  created_at: {
+  createdAt: {
     type: Date,
     default: Date.now(),
   },
 
-  updated_at: {
+  updatedAt: {
     type: Date,
   },
 
@@ -78,7 +65,7 @@ const userSchema = new mongoose.Schema({
     maxLength: 6,
   },
 
-  otp_expiry_time: {
+  otpExpiryTime: {
     type: Date,
   },
 });
@@ -89,11 +76,6 @@ userSchema.pre('save', async function (next) {
 
   this.otp = await bcrypt.hash(this.otp, 12);
 
-  next();
-});
-
-userSchema.pre('save', async function (next) {
-  // Only run when the Password is modified
   if (!this.isModified('password')) return next();
 
   this.otp = await bcrypt.hash(this.otp, 12);
@@ -116,20 +98,20 @@ userSchema.methods.correctPassword = async function (
 };
 
 userSchema.methods.createPasswordResetToken = function () {
-  const resetPasswordToken = crypto.randomBytes(32).toString('hex');
+  const resetToken = crypto.randomBytes(32).toString('hex');
 
-  this.password_reset_token = crypto
+  this.passwordPesetToken = crypto
     .createHash('sha256')
     .update(resetPasswordToken)
     .digest('hex');
 
-  this.password_reset_expires = Date.now() + 10 * 60 * 1000; // 10 minutes
+  this.passwordResetExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
 
-  return resetPasswordToken;
+  return resetToken;
 };
 
 userSchema.changedPasswordAfter = function (JWTTimestamp) {
-  return JWTTimestamp < this.password_changed_at;
+  return JWTTimestamp < this.passwordChangedAt;
 };
 
 const User = new mongoose.model('User', userSchema);

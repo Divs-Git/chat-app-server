@@ -9,20 +9,20 @@ import dotenv from 'dotenv';
 
 dotenv.config({ path: '../config.env' });
 
-function signToken(user_id) {
+function signToken(userID) {
   jwt.sign(
     {
-      user_id,
+      userID,
     },
     process.env.JWT_SECRET
   );
 }
 
-export const register = async (req, res, next) => {
+const register = async (req, res, next) => {
   const { firstName, lastName, email, password, verified } = req.body;
 
   // Check if the verified user already exists with the provided email
-  const existing_user = await User.findOne({ email });
+  const existingUser = await User.findOne({ email });
 
   const filteredBody = filterObj(
     req.body,
@@ -33,7 +33,7 @@ export const register = async (req, res, next) => {
   );
 
   // If the user exists and is verified, return an error
-  if (existing_user && existing_user.verified) {
+  if (existingUser && existingUser.verified) {
     return res.status(400).json({
       status: 'error',
       message: 'Email already in use, please login',
@@ -41,69 +41,78 @@ export const register = async (req, res, next) => {
   }
 
   // If the user exists but is not verified, update the user's information
-  else if (existing_user) {
+  else if (existingUser) {
     await User.findOneAndUpdate({ email }, filteredBody, {
       new: true,
       validateModifiedOnly: true,
     });
 
     // generate OTP and send it to the user
-    req.user_id = existing_user._id;
+    req.UserID = existingUser._id;
     next();
   }
 
   // If the user does not exist, create a new user
   else {
-    const new_user = User.create(filteredBody);
-
+    const newUser = await User.create(filteredBody);
+    console.log(filteredBody);
+    console.log(newUser);
     // generate OTP and send it to the user
-    req.user_id = new_user._id;
+    req.userID = newUser._id;
     next();
   }
 };
 
-export const sendOTP = async (req, res, next) => {
-  const { user_id } = req;
-  const new_otp = otpGenerator.generate(6, {
+const sendOTP = async (req, res, next) => {
+  const { userID } = req;
+  const newOTP = otpGenerator.generate(6, {
     lowerCaseAlphabets: false,
     upperCaseAlphabets: false,
     specialChars: false,
   });
 
-  const otp_expiry_time = Date.now() + 10 * 60 * 1000; // 10 minutes
+  const otpExpiryTime = Date.now() + 10 * 60 * 1000; // 10 minutes
 
-  await User.findByIdAndUpdate(user_id, {
-    otp: new_otp,
-    otp_expiry_time,
+  await User.findByIdAndUpdate(userID, {
+    otp: newOTP,
+    otpExpiryTime,
+  });
+
+  return res.status(200).json({
+    status: 'success',
+    message: 'OTP sent successfully',
   });
 
   // TODO: Send the OTP to the user via email
-  mailService
-    .sendEmail({
-      from: 'divyansh.sri258@gmail.com',
-      to: 'example@gmail.com',
-      subject: 'OTP for Chatr',
-      text: `Your OTP for Chatr is ${new_otp}. It will expire in 10 minutes`,
-    })
-    .then(() => {
-      res.status(200).json({
-        status: 'success',
-        message: 'OTP sent successfully',
-      });
-    })
-    .catch((error) => {
-      return res.status(500).json({
-        status: 'error',
-        message: 'There was an error sending the OTP. Try again later',
-      });
-    });
+  // mailService
+  //   .sendEmail({
+  //     from: 'divyansh.sri258@gmail.com',
+  //     to: 'example@gmail.com',
+  //     subject: 'OTP for Chatr',
+  //     text: `Your OTP for Chatr is ${newOTP}. It will expire in 10 minutes`,
+  //   })
+  //   .then(() => {
+  //     res.status(200).json({
+  //       status: 'success',
+  //       message: 'OTP sent successfully',
+  //     });
+  //   })
+  //   .catch((error) => {
+  //     return res.status(500).json({
+  //       status: 'error',
+  //       message: 'There was an error sending the OTP. Try again later',
+  //     });
+  //   });
 };
 
-export const verifyOTP = async (req, res, next) => {
+const verifyOTP = async (req, res, next) => {
   // Verify the OTP and update the user's verified status
   const { email, otp } = req.body;
 
-  const user = User.findOne({ email, otp_expiry_time: { $gt: Date.now() } }); // Check if the OTP is still valid
+  const user = await User.findOne({
+    email,
+    otpExpiryTime: { $gt: Date.now() },
+  }); // Check if the OTP is still valid
 
   if (!user) {
     return res.status(400).json({
@@ -134,7 +143,7 @@ export const verifyOTP = async (req, res, next) => {
   });
 };
 
-export const login = async (req, res, next) => {
+const login = async (req, res, next) => {
   const { email, password } = req.body;
   if (!email || !password) {
     return res
@@ -166,7 +175,7 @@ export const login = async (req, res, next) => {
  * 2. Unprotected routes
  */
 
-export const protect = async (req, res, next) => {
+const protect = async (req, res, next) => {
   // 1. Get the JWT token and check if it exists
   let token;
 
@@ -188,9 +197,9 @@ export const protect = async (req, res, next) => {
   const decoded = await promisify(jwt.verify)(token, process.env.JWT_SECRET);
 
   // 3. Check if the user still exists
-  const current_user = await User.findById(decoded.user_id);
+  const currentUser = await User.findById(decoded.userID);
 
-  if (!current_user) {
+  if (!currentUser) {
     return res.status(401).json({
       status: 'error',
       message: 'The user no longer exist',
@@ -199,7 +208,7 @@ export const protect = async (req, res, next) => {
 
   // 4. Check if the user changed the password after the token was issued
   // iat -> issued at
-  if (current_user.changedPasswordAfter(decoded.iat)) {
+  if (currentUser.changedPasswordAfter(decoded.iat)) {
     return res.status(401).json({
       status: 'error',
       message: 'User recently changed password! Please log in again',
@@ -207,11 +216,11 @@ export const protect = async (req, res, next) => {
   }
 
   // 5. Grant access to the protected route
-  req.user = current_user;
+  req.user = currentUser;
   next();
 };
 
-export const forgotPassword = async (req, res, next) => {
+const forgotPassword = async (req, res, next) => {
   // Find the user with the provided email
   const user = await User.findOne({ email: req.body.email });
 
@@ -235,8 +244,8 @@ export const forgotPassword = async (req, res, next) => {
       message: 'Reset token sent to email',
     });
   } catch (error) {
-    user.password_reset_token = undefined;
-    user.password_reset_expires = undefined;
+    user.passwordResetToken = undefined;
+    user.passwordResetExpires = undefined;
 
     await user.save({ validateBeforeSave: false });
 
@@ -247,7 +256,7 @@ export const forgotPassword = async (req, res, next) => {
   }
 };
 
-export const resetPassword = async (req, res, next) => {
+const resetPassword = async (req, res, next) => {
   // Find the user with the provided reset token
   const hashedToken = crypto
     .createHash('sha256')
@@ -255,8 +264,8 @@ export const resetPassword = async (req, res, next) => {
     .digest('hex');
 
   const user = await User.findOne({
-    password_reset_token: hashedToken,
-    password_reset_expires: { $gt: Date.now() },
+    passwordResetToken: hashedToken,
+    passwordResetExpires: { $gt: Date.now() },
   });
 
   if (!user) {
@@ -264,15 +273,13 @@ export const resetPassword = async (req, res, next) => {
       status: 'error',
       message: 'Token is invalid or has expired',
     });
-
-    return;
   }
 
   // Update the user's password
   user.password = req.body.password;
   user.confirmPassword = req.body.confirmPassword;
-  user.password_reset_token = undefined;
-  user.password_reset_expires = undefined;
+  user.passwordResetToken = undefined;
+  user.passwordResetExpires = undefined;
 
   await user.save();
 

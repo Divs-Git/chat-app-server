@@ -1,6 +1,6 @@
 import User from '../models/user.js';
 
-export const updateMe = async (req, res, next) => {
+const updateMe = async (req, res, next) => {
   const { user } = req;
 
   const filteredBody = filterObj(
@@ -11,14 +11,14 @@ export const updateMe = async (req, res, next) => {
     'avatar'
   );
 
-  const updated_user = await User.findByIdAndUpdate(user._id, filtered, {
+  const updatedUser = await User.findByIdAndUpdate(user._id, filteredBody, {
     new: true,
     validateModifiedOnly: true,
   });
 
   res.status(200).json({
     status: 'success',
-    data: updated_user,
+    data: updatedUser,
     message: 'User updated successfully',
   });
 };
