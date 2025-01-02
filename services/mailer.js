@@ -31,11 +31,13 @@ const sendSGMail = async ({
   }
 };
 
-export default async function sendMail({ args }) {
+async function sendMail({ args }) {
   // If the environment is development, return a resolved promise to prevent sending emails
   if (process.env.NODE_ENV === 'development') {
-    return new Promise.resolve();
+    return Promise.resolve();
   } else {
     return sendSGMail(args);
   }
 }
+
+export default { sendMail };

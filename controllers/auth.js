@@ -55,8 +55,7 @@ const register = async (req, res, next) => {
   // If the user does not exist, create a new user
   else {
     const newUser = await User.create(filteredBody);
-    console.log(filteredBody);
-    console.log(newUser);
+
     // generate OTP and send it to the user
     req.userID = newUser._id;
     next();
@@ -73,23 +72,28 @@ const sendOTP = async (req, res, next) => {
 
   const otpExpiryTime = Date.now() + 10 * 60 * 1000; // 10 minutes
 
-  await User.findByIdAndUpdate(userID, {
-    otp: newOTP,
+  const user = await User.findByIdAndUpdate(userID, {
     otpExpiryTime,
   });
 
-  return res.status(200).json({
+  // TODO: Send the OTP to the user via email
+  user.otp = newOTP.toString();
+
+  console.log(user.otp);
+
+  await user.save({ new: true, validateModifiedOnly: true });
+
+  res.status(200).json({
     status: 'success',
     message: 'OTP sent successfully',
   });
 
-  // TODO: Send the OTP to the user via email
   // mailService
-  //   .sendEmail({
-  //     from: 'divyansh.sri258@gmail.com',
-  //     to: 'example@gmail.com',
-  //     subject: 'OTP for Chatr',
-  //     text: `Your OTP for Chatr is ${newOTP}. It will expire in 10 minutes`,
+  //   .sendMail({
+  //     from: 'tdyphotography39@gmail.com',
+  //     to: user.email,
+  //     subject: 'Verification OTP for Chatr',
+  //     html: otp(user),
   //   })
   //   .then(() => {
   //     res.status(200).json({
@@ -98,6 +102,7 @@ const sendOTP = async (req, res, next) => {
   //     });
   //   })
   //   .catch((error) => {
+  //     console.log(error);
   //     return res.status(500).json({
   //       status: 'error',
   //       message: 'There was an error sending the OTP. Try again later',

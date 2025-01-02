@@ -61,7 +61,7 @@ const userSchema = new mongoose.Schema({
   },
 
   otp: {
-    type: Number,
+    type: String,
     maxLength: 6,
   },
 
@@ -72,14 +72,18 @@ const userSchema = new mongoose.Schema({
 
 userSchema.pre('save', async function (next) {
   // Only run when the OTP is modified
-  if (!this.isModified('otp')) return next();
+  if (!this.isModified('otp') || !this.otp) return next();
 
   this.otp = await bcrypt.hash(this.otp, 12);
+  console.log(this.otp);
+  next();
+});
 
-  if (!this.isModified('password')) return next();
+userSchema.pre('save', async function (next) {
+  // Only run when the password is modified
+  if (!this.isModified('password') || !this.password) return next();
 
-  this.otp = await bcrypt.hash(this.otp, 12);
-
+  this.password = await bcrypt.hash(this.password, 12);
   next();
 });
 
@@ -102,7 +106,7 @@ userSchema.methods.createPasswordResetToken = function () {
 
   this.passwordPesetToken = crypto
     .createHash('sha256')
-    .update(resetPasswordToken)
+    .update(resetToken)
     .digest('hex');
 
   this.passwordResetExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
