@@ -238,6 +238,9 @@ const forgotPassword = async (req, res, next) => {
 
   // Generate a password reset token
   const resetToken = user.createPasswordResetToken();
+  await user.save({ validateBeforeSave: false });
+
+  console.log(resetToken);
 
   const resetURL = `https://chatr.com/resetPassword/?code=${resetToken}`;
 
@@ -263,9 +266,10 @@ const forgotPassword = async (req, res, next) => {
 
 const resetPassword = async (req, res, next) => {
   // Find the user with the provided reset token
+
   const hashedToken = crypto
     .createHash('sha256')
-    .update(req.params.token)
+    .update(req.body.token)
     .digest('hex');
 
   const user = await User.findOne({
