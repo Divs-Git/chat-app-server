@@ -6,6 +6,7 @@ import mongoSanitize from 'express-mongo-sanitize'; // Express middleware to san
 import bodyParser from 'body-parser'; // Node.js body parsing middleware
 import xss from 'xss'; // Library to prevent cross-site scripting attacks
 import cors from 'cors'; // Enable CORS with various options
+import routes from './routes/index.js'; // Import routes
 
 const app = express();
 
@@ -40,5 +41,7 @@ app.use(
     credentials: true, // enable set cookie with CORS in browser
   })
 );
+
+app.use(routes);
 
 export default app;
