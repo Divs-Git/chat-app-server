@@ -10,7 +10,7 @@ import dotenv from 'dotenv';
 dotenv.config({ path: '../config.env' });
 
 function signToken(userID) {
-  jwt.sign(
+  return jwt.sign(
     {
       userID,
     },
