@@ -75,7 +75,6 @@ userSchema.pre('save', async function (next) {
   if (!this.isModified('otp') || !this.otp) return next();
 
   this.otp = await bcrypt.hash(this.otp, 12);
-  console.log(this.otp);
   next();
 });
 
@@ -111,7 +110,6 @@ userSchema.methods.createPasswordResetToken = function () {
 
   this.passwordResetExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
 
-  console.log(this.passwordResetToken, this.passwordResetExpires);
   return resetToken;
 };
 

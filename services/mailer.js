@@ -1,43 +1,34 @@
 import sgMail from '@sendgrid/mail';
 import dotenv from 'dotenv';
 
-dotenv.config({ path: '../config.env' });
+dotenv.config();
 
 sgMail.setApiKey(process.env.SG_KEY);
 
-const sendSGMail = async ({
-  recipient,
-  sender,
-  subject,
-  html,
-  text,
-  attachments,
-}) => {
+const sendSGMail = async ({ to, sender, subject, html, attachments, text }) => {
   try {
-    const from = sender || process.env.SENDGRID_SENDER;
+    const from = 'gelidcoding@gmail.com';
 
     const msg = {
-      to: recipient,
-      from,
-      subject,
-      html,
-      text,
+      to: to,
+      from: from,
+      subject: subject,
+      html: html,
       attachments,
     };
-
+    console.log('success mailed');
     return sgMail.send(msg);
   } catch (error) {
     console.log(error);
   }
 };
 
-async function sendMail({ args }) {
-  // If the environment is development, return a resolved promise to prevent sending emails
+const sendMail = async (args) => {
   if (process.env.NODE_ENV === 'development') {
     return Promise.resolve();
   } else {
     return sendSGMail(args);
   }
-}
+};
 
 export default { sendMail };

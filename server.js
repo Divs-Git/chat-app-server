@@ -3,7 +3,7 @@ import http from 'http';
 import dotenv from 'dotenv';
 import mongoose from 'mongoose';
 
-dotenv.config({ path: './config.env' });
+dotenv.config();
 
 const server = http.createServer(app);
 
