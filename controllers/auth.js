@@ -8,6 +8,7 @@ import mailService from '../services/mailer.js';
 import dotenv from 'dotenv';
 import resetPasswordTemplate from '../templates/resetPasswordTemplate.js';
 import otpTemplate from '../templates/otpTemplate.js';
+import successfullyResetPasswordTemplate from '../templates/successfullyResetPasswordTemplate.js';
 
 dotenv.config();
 
@@ -235,7 +236,7 @@ const forgotPassword = async (req, res, next) => {
   await user.save({ validateBeforeSave: false });
 
   try {
-    const resetURL = `https://localhost:8080/auth/reset-password/?code=${resetToken}`;
+    const resetURL = `http://localhost:3000/auth/reset-password/?code=${resetToken}`;
 
     mailService.sendMail({
       to: user.email,
@@ -254,7 +255,7 @@ const forgotPassword = async (req, res, next) => {
 
     await user.save({ validateBeforeSave: false });
 
-    res.status(500).json({
+    return res.status(500).json({
       status: 'error',
       message: 'There was an error sending the email. Try again later!',
     });
@@ -289,12 +290,21 @@ const resetPassword = async (req, res, next) => {
 
   await user.save();
 
-  // Log the user in and send a JWT
-
-  // TODO: Send the user a confirmation email that their password has been changed
+  // Send the user a confirmation email that their password has been changed
+  try {
+    mailService.sendMail({
+      to: user.email,
+      subject: 'Password Reset Confirmation',
+      html: successfullyResetPasswordTemplate(user.email),
+      attachments: [],
+    });
+  } catch (error) {
+    console.log(error);
+  }
 
   const token = signToken(user._id);
 
+  // Log the user in and send a JWT
   res.status(200).json({
     status: 'success',
     message: 'Password reset successfully',
