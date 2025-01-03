@@ -6,8 +6,9 @@ import otpGenerator from 'otp-generator';
 import { promisify } from 'util';
 import mailService from '../services/mailer.js';
 import dotenv from 'dotenv';
+import resetPasswordTemplate from '../templates/resetPasswordTemplate.js';
 
-dotenv.config({ path: '../config.env' });
+dotenv.config();
 
 function signToken(userID) {
   return jwt.sign(
@@ -17,6 +18,57 @@ function signToken(userID) {
     process.env.JWT_SECRET
   );
 }
+
+/**
+ * Types of routes:
+ * 1. Protected routes -> require the user to be logged in
+ * 2. Unprotected routes
+ */
+
+const protect = async (req, res, next) => {
+  // 1. Get the JWT token and check if it exists
+  let token;
+
+  if (
+    req.headers.authorization &&
+    req.headers.authorization.startsWith('Bearer')
+  ) {
+    token = req.headers.authorization.split(' ')[1];
+  } else if (req.cookies.jwt) {
+    token = req.cookies.jwt;
+  } else {
+    return res.status(401).json({
+      status: 'error',
+      message: 'You are not logged in. Please log in to get access',
+    });
+  }
+
+  // 2. Verify the token
+  const decoded = await promisify(jwt.verify)(token, process.env.JWT_SECRET);
+
+  // 3. Check if the user still exists
+  const currentUser = await User.findById(decoded.userID);
+
+  if (!currentUser) {
+    return res.status(401).json({
+      status: 'error',
+      message: 'The user no longer exist',
+    });
+  }
+
+  // 4. Check if the user changed the password after the token was issued
+  // iat -> issued at
+  if (currentUser.changedPasswordAfter(decoded.iat)) {
+    return res.status(401).json({
+      status: 'error',
+      message: 'User recently changed password! Please log in again',
+    });
+  }
+
+  // 5. Grant access to the protected route
+  req.user = currentUser;
+  next();
+};
 
 const register = async (req, res, next) => {
   const { firstName, lastName, email, password, verified } = req.body;
@@ -174,57 +226,6 @@ const login = async (req, res, next) => {
   });
 };
 
-/**
- * Types of routes:
- * 1. Protected routes -> require the user to be logged in
- * 2. Unprotected routes
- */
-
-const protect = async (req, res, next) => {
-  // 1. Get the JWT token and check if it exists
-  let token;
-
-  if (
-    req.headers.authorization &&
-    req.headers.authorization.startsWith('Bearer')
-  ) {
-    token = req.headers.authorization.split(' ')[1];
-  } else if (req.cookies.jwt) {
-    token = req.cookies.jwt;
-  } else {
-    return res.status(401).json({
-      status: 'error',
-      message: 'You are not logged in. Please log in to get access',
-    });
-  }
-
-  // 2. Verify the token
-  const decoded = await promisify(jwt.verify)(token, process.env.JWT_SECRET);
-
-  // 3. Check if the user still exists
-  const currentUser = await User.findById(decoded.userID);
-
-  if (!currentUser) {
-    return res.status(401).json({
-      status: 'error',
-      message: 'The user no longer exist',
-    });
-  }
-
-  // 4. Check if the user changed the password after the token was issued
-  // iat -> issued at
-  if (currentUser.changedPasswordAfter(decoded.iat)) {
-    return res.status(401).json({
-      status: 'error',
-      message: 'User recently changed password! Please log in again',
-    });
-  }
-
-  // 5. Grant access to the protected route
-  req.user = currentUser;
-  next();
-};
-
 const forgotPassword = async (req, res, next) => {
   // Find the user with the provided email
   const user = await User.findOne({ email: req.body.email });
@@ -240,12 +241,16 @@ const forgotPassword = async (req, res, next) => {
   const resetToken = user.createPasswordResetToken();
   await user.save({ validateBeforeSave: false });
 
-  console.log(resetToken);
-
-  const resetURL = `https://chatr.com/resetPassword/?code=${resetToken}`;
-
   try {
     // TODO: Send the resetURL to the user via email
+    const resetURL = `https://localhost:8080/auth/reset-password/?code=${resetToken}`;
+
+    mailService.sendMail({
+      to: user.email,
+      subject: 'Reset Password',
+      html: resetPasswordTemplate(user.firstName, resetURL),
+      attachments: [],
+    });
 
     res.status(200).json({
       status: 'success',
