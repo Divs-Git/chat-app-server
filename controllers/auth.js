@@ -7,6 +7,7 @@ import { promisify } from 'util';
 import mailService from '../services/mailer.js';
 import dotenv from 'dotenv';
 import resetPasswordTemplate from '../templates/resetPasswordTemplate.js';
+import otpTemplate from '../templates/otpTemplate.js';
 
 dotenv.config();
 
@@ -100,7 +101,7 @@ const register = async (req, res, next) => {
     });
 
     // generate OTP and send it to the user
-    req.UserID = existingUser._id;
+    req.userID = existingUser._id;
     next();
   }
 
@@ -128,38 +129,29 @@ const sendOTP = async (req, res, next) => {
     otpExpiryTime,
   });
 
-  // TODO: Send the OTP to the user via email
-  user.otp = newOTP.toString();
-
-  console.log(user.otp);
+  user.otp = newOTP;
 
   await user.save({ new: true, validateModifiedOnly: true });
 
-  res.status(200).json({
-    status: 'success',
-    message: 'OTP sent successfully',
-  });
-
-  // mailService
-  //   .sendMail({
-  //     from: 'tdyphotography39@gmail.com',
-  //     to: user.email,
-  //     subject: 'Verification OTP for Chatr',
-  //     html: otp(user),
-  //   })
-  //   .then(() => {
-  //     res.status(200).json({
-  //       status: 'success',
-  //       message: 'OTP sent successfully',
-  //     });
-  //   })
-  //   .catch((error) => {
-  //     console.log(error);
-  //     return res.status(500).json({
-  //       status: 'error',
-  //       message: 'There was an error sending the OTP. Try again later',
-  //     });
-  //   });
+  mailService
+    .sendMail({
+      to: user.email,
+      subject: 'Verification OTP for Chatr',
+      html: otpTemplate(user.email, newOTP),
+    })
+    .then(() => {
+      res.status(200).json({
+        status: 'success',
+        message: 'OTP sent successfully',
+      });
+    })
+    .catch((error) => {
+      console.log(error);
+      return res.status(500).json({
+        status: 'error',
+        message: 'There was an error sending the OTP. Try again later',
+      });
+    });
 };
 
 const verifyOTP = async (req, res, next) => {
@@ -188,6 +180,7 @@ const verifyOTP = async (req, res, next) => {
   // OTP is correct, update the user's verified status
   user.verified = true;
   user.otp = undefined;
+  user.otpExpiryTime = undefined;
 
   await user.save({ new: true, validateModifiedOnly: true });
 
@@ -242,7 +235,6 @@ const forgotPassword = async (req, res, next) => {
   await user.save({ validateBeforeSave: false });
 
   try {
-    // TODO: Send the resetURL to the user via email
     const resetURL = `https://localhost:8080/auth/reset-password/?code=${resetToken}`;
 
     mailService.sendMail({

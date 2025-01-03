@@ -16,6 +16,7 @@ const sendSGMail = async ({ to, sender, subject, html, attachments, text }) => {
       html: html,
       attachments,
     };
+    console.log('success mailed');
     return sgMail.send(msg);
   } catch (error) {
     console.log(error);
